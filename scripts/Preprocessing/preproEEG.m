@@ -1,4 +1,7 @@
 function preproEEG(varargin)
+
+    eeglab;
+
     % Create an instance of the inputParser class
     p = inputParser;
 
@@ -159,7 +162,7 @@ function preproEEG(varargin)
         end
     end
 % (10) Save dataset
-    EEG.setname = [idNum, '_pp'];
+    EEG.setname = [idNum, '_' , type_of_pp];
     pop_saveset(EEG, 'filename', nameOutpp);
 end
 

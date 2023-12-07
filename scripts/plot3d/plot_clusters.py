@@ -57,21 +57,22 @@ def mni2tal_matrix():
 fig, axes = plt.subplots(3, 5, figsize=(20, 12))
 
 # Specify the directory path
-directory_path = r'D:\shared_git\MaestriaThesis\results\EEGLAB_STUDY'
+directory_path = r'D:\shared_git\MaestriaThesis\results\pp03\eeglabStudy\MatlabDS'
 
 # List all files in the directory
 file_list = os.listdir(directory_path)
 
 # Filter for .mat files
 mat_files = [file for file in file_list if file.endswith('.mat')]
-a = [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1] #np.arange(0,15)
+a = [1,1,1,1,1,1,1,1,1,1,1] #np.arange(0,15)
 # Loop through each .mat file
 for idx, mat_file in enumerate(mat_files):
     mat_file_path = os.path.join(directory_path, mat_file)
     # Load the MATLAB .mat file
     mat_data = scipy.io.loadmat(mat_file_path)
-    locs_data = mat_data['locs'][1:, :]  # Exclude the first row
-    dmn_coords = locs_data #[(0, -52, 18), (-46, -68, 32), (46, -68, 32), (1, 50, -5)]
+    locs_data = mat_data['DataStruct']['locs']  # Exclude the first row
+    dmn_coords = locs_data[0][0][1:, :] #[(0, -52, 18), (-46, -68, 32), (46, -68, 32), (1, 50, -5)]
+    print(dmn_coords)
     # Plot in the current subplot
     ax = axes[idx // 5, idx % 5]
     # Set smaller and centered title without '_loc.mat' part

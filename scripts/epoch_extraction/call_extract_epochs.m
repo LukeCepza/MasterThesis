@@ -1,12 +1,12 @@
 addpath("D:\NYNGroup\eeglab2023.1\");
 clear;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% CONFIGURATION VARIABLES
-type_of_pp  = 'pp02';
+%% pp03 CONFIGURATION VARIABLES
+type_of_pp  = 'pp03';
 dataPath    = 'D:\shared_git\MaestriaThesis\data';
-ppnum = type_of_pp;
-id_str = 'aaaa';
-do_dipolefit = false;
+id_str = 'ID##';
+do_dipolefit = true;
+rerunAMICA = true;
 % structure of epochNames pair is {label, foldername, save name concatenate}
 epochNamesPairs = {
     {'33028'  '33029'  '33030'  '33031'}, 'Air',['_' , type_of_pp , '_eAir'];
@@ -27,8 +27,8 @@ epochNamesPairs = {
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Extract Epochs
 % Name is {label, Folder, set name}
-[~,~,~] = eeglab;
-for i = 1
+parfor i = 12:50
+    [~,~,~] = eeglab;
     id_str = sprintf('ID%02d', i);    
     nameInE = fullfile(dataPath, id_str, type_of_pp, ['E_', id_str, '_' , type_of_pp , '.set']);
 
@@ -38,11 +38,12 @@ for i = 1
         disp("Epoching " + id_str);
        % EEG = pop_loadset('filename',['E_', id_str,'_pp.set' ],'filepath',fullfile(dataPath,id_str));
        
-        extract_epochs(ppnum,                                   ...
+        extract_epochs(type_of_pp,                                   ...
                        epochNamesPairs,                         ...
                        dataPath,                                ...
                        id_str,                                  ...
-                       'do_dipolefit', do_dipolefit);
+                       'do_dipolefit', do_dipolefit, ...
+                       'rerunAMICA', rerunAMICA);
     else
         % file doesn't exist
         disp("Skipping " + nameInE + " - file does not exist.");
