@@ -7,18 +7,19 @@ dataPath    = 'D:\shared_git\MaestriaThesis\data';
 ggERP       = true;                    
 PSD         = false;
 ERSP_ITPC   = true;
-DipClus     = true;
+DipClus     = false;
 savejpg     = true;
 savemat     = true;
 saveStudy   = true;
 recompute = true;
-plot_clustmetrics = true;
+plot_clustmetrics = false;
 StudyInfo  = {};
 outPath    =  fullfile('D:\shared_git\MaestriaThesis\results', type_of_pp, 'eeglabStudy');
 listStimuli = {'Air','Air1','Air2','Air3','Air4',...
                'Vib','Vib1','Vib2','Vib3','Vib4',...
                'Car','Car1','Car2','Car3','Car4'};
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 parfor type = 1:15
     tstimul = listStimuli{type};
     StudyInfo = getStudyInfo(tstimul,type_of_pp);

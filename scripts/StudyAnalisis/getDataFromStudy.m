@@ -93,15 +93,16 @@ end
         close(fignum+30)
     %else Not really necesary
         %STUDY = std_dipplot(STUDY,ALLEEG,'clusters','all','figure', 'on');
+    
+        if savemat
+            locs = zeros(numclust+1,3);
+            for clust = 2:numclust+1
+                locs(clust,:) = STUDY.cluster(clust).dipole.posxyz;
+            end
+            DataStruct.locs = locs;
+        end
     end
 
-    if savemat
-        locs = zeros(numclust+1,3);
-        for clust = 2:numclust+1
-            locs(clust,:) = STUDY.cluster(clust).dipole.posxyz;
-        end
-        DataStruct.locs = locs;
-    end
     
     
 %% Do ERSP and ITC
@@ -121,7 +122,8 @@ end
             channels = {'Fp1';'Fp2';'F3'; 'F4';'C3';'C4';'P3'; ...
                 'P4';'O1';'O2';'F7';'F8';'T7';'T8';'P7'; ...
                 'P8';'Fz';'Cz';'Pz';'AFz';'CPz'; 'POz'};
-            [~,ersp, ersptimes, erspfreqs] =std_erspplot(STUDY,ALLEEG,'channels',channels(i), 'design', 1,'noplot','on');
+            [~,ersp, ersptimes, erspfreqs] = std_erspplot(STUDY,ALLEEG,'channels',channels(i), 'design', 1,'noplot','on');
+            %media
             ERSP(i,:,:) = mean(ersp{:,:,:},3);
             cwtAll{i} = ersp;
              
@@ -154,17 +156,16 @@ end
     if do_ggERP && recompute
         [STUDY, ALLEEG] = std_precomp(STUDY, ALLEEG, {},'savetrials','on',...
         'recompute','on','rmicacomps','on','interp','on','erp','on');
-        
-        ggERP = zeros(22,1000);
-        for i = 1:22
-            channels = {'Fp1';'Fp2';'F3'; 'F4';'C3';'C4';'P3'; ...
-            'P4';'O1';'O2';'F7';'F8';'T7';'T8';'P7'; ...
-            'P8';'Fz';'Cz';'Pz';'AFz';'CPz'; 'POz'};
-            [~,erp]=std_erpplot(STUDY,ALLEEG,'channels',channels(i), 'design', 1,'noplot','on');
-            ggERP(i,:) = mean(cell2mat(erp),2);
-        end
-        DataStruct.ggERP = ggERP;
     end
+    ggERP = zeros(22,1000);
+    for i = 1:22
+        channels = {'Fp1';'Fp2';'F3'; 'F4';'C3';'C4';'P3'; ...
+        'P4';'O1';'O2';'F7';'F8';'T7';'T8';'P7'; ...
+        'P8';'Fz';'Cz';'Pz';'AFz';'CPz'; 'POz'};
+        [~,erp]=std_erpplot(STUDY,ALLEEG,'channels',channels(i), 'design', 1,'noplot','on');
+        ggERP(i,:) = mean(cell2mat(erp),2);
+    end
+    DataStruct.ggERP = ggERP;
 %% Save
     if saveStudy
         pop_savestudy( STUDY, EEG, 'filename', [tstimul , '.study'] ,...
@@ -180,12 +181,20 @@ end
     if savejpg
         save ERP
         figure(fignum+10)   
-        plotERPFull_TL(tstimul,DataStruct.ggERP,{[1 0 0]},0.9,fignum+10)
+
+        ts = -1000:1/250*1000:2999;
+        plotERPFull_TL(DataStruct.ggERP,ts ...
+        ,'ylimits' , [-3 3]...
+        ,'tstimul' , tstimul...
+        ,'figColor', [1 0 0]...
+        ,'LineW'   , 0.9...
+        ,'fig_n'   , fignum+10)
         saveas(fignum+10, fullfile('D:\shared_git\MaestriaThesis\results',...
             type_of_pp,'eeglabStudy','PlotERP',[tstimul,'.jpg']));% Functions
+        pause(1)
         clf(fignum+10)
 
-        % save ERSP
+        %save ERSP
         plotERSPFull_TL(tstimul,DataStruct.ERSP,fignum+10, ...
             'ylim', [3, 30] , 'clim', [-1, 1], ...
             'freq', DataStruct.erspfreqs, 'ts', DataStruct.ersptimes );

@@ -19,7 +19,7 @@ function MI = mutual_information(X,Y,varargin)
         numBinsX = freedmanDiaconisRule(X);
         numBinsY = freedmanDiaconisRule(Y);
     end
-    
+
     % Estimate PDF
     P_X = histcounts(X, numBinsX, 'Normalization', 'probability');
     P_Y = histcounts(Y, numBinsY, 'Normalization', 'probability');

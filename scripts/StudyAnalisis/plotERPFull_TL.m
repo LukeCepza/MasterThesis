@@ -1,9 +1,31 @@
+function plotERPFull_TL(ERP_list, ts, varargin)
 
-function plotERPFull_TL(tstimul, ERP_list, figColor, LineW, fig_n)
-    ts = -1000:1/250*1000:2999;
+    p = inputParser;
 
+        % Define the mandatory argument
+    addRequired(p, 'ERP_list', @isnumeric);
+    addRequired(p, 'ts', @isnumeric);
+
+    addParameter(p, 'ylimits', [-3 3], @isnumeric)
+    addParameter(p, 'tstimul', '', @ischar)
+    addParameter(p, 'figColor', [1 1 1], @isnumeric)
+    addParameter(p, 'LineW', 0.9, @isnumeric)
+    addParameter(p, 'fig_n', 99, @isnumeric)
+
+    % Parse the input arguments
+    parse(p, ERP_list, ts, varargin{:});
+
+   % Access the parsed values
+    ERP_list = p.Results.ERP_list;
+    ts= p.Results.ts;
+    ylimits = p.Results.ylimits;
+    tstimul = p.Results.tstimul;
+    figColor = p.Results.figColor;
+    LineW = p.Results.LineW;
+    fig_n = p.Results.fig_n;
+    
     f = figure(fig_n); 
-    f.Name = 'ERP Plot'; 
+    f.Name = '22 Chan Plot ERP'; 
     f.Color = 'white'; 
     pause(1); 
     set(gcf, 'Position', [0 0 1500, 700]); % Set size
@@ -32,13 +54,15 @@ function plotERPFull_TL(tstimul, ERP_list, figColor, LineW, fig_n)
         
         % Plot ERP
         hold on;
-        plot(ts, Gav, 'LineWidth', LineW, 'Color', cell2mat(figColor));
+        plot(ts, Gav, 'LineWidth', LineW, 'Color', figColor);
         set(gca, 'Xtick', [-200, 0, 400], 'Ytick', [-4, 0, 6]);
         set(gca, 'FontUnits', 'points', 'FontName', 'Sans', 'FontSize', 10);
-        axis([-1000 2000 -3 3]);
+        xlim([-1000 2000])
+        ylim(ylimits)
         line([0 0], [0 2], 'Color', [0.1 0.1 0.1], 'LineWidth', 0.8);
         yline(0, 'LineWidth', 1, 'Color', [0.1 0.1 0.1], 'Alpha', 0.4);
-        title(chpltloc);
+        yline(0, 'LineWidth', 1, 'Color', [0.1 0.1 0.1], 'Alpha', 0.4);
+
 
         ax = gca;
         ax.XAxisLocation = 'origin';

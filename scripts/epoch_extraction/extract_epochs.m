@@ -9,6 +9,8 @@ function extract_epochs(ppnum, epochNamesPairs, dataPath, id_str, varargin)
     addRequired(p, 'id_str', @ischar);
     addParameter(p, 'do_dipolefit', false, @islogical);
     addParameter(p,'rerunAMICA', false, @islogical)
+    addParameter(p,'rerunInfoMaxICA', false, @islogical)
+
     % Parse the input arguments
     parse(p, ppnum, epochNamesPairs, dataPath, id_str, varargin{:});
 
@@ -20,6 +22,7 @@ function extract_epochs(ppnum, epochNamesPairs, dataPath, id_str, varargin)
     epochNamesPairs = p.Results.epochNamesPairs;
     do_dipolefit = p.Results.do_dipolefit;
     rerunAMICA = p.Results.rerunAMICA;
+    rerunInfoMaxICA = p.Results.rerunInfoMaxICA;
 
     EEG = pop_loadset('filename',['E_', id_str,'_', ppnum ,'.set' ],'filepath',fullfile(dataPath,id_str, ppnum));
 
@@ -45,7 +48,14 @@ function extract_epochs(ppnum, epochNamesPairs, dataPath, id_str, varargin)
             
             EEGt = iclabel(EEGt);
             EEGt = pop_icflag(EEGt, [NaN NaN;0.6 1;0.6 1;0.6 1;0.6 1;0.6 1;0.6 1]);
-            EEGt = pop_subcomp(EEGt,find(EEGt.reject.gcompreject), 0,0);
+            %EEGt = pop_subcomp(EEGt,find(EEGt.reject.gcompreject), 0,0);
+        end
+
+        if rerunInfoMaxICA
+            EEG = pop_runica(EEG, 'icatype', 'runica', 'extended', 1, ...
+            'lrate', 1e-5, 'maxsteps', 2000,'interrupt','off'); % 1300th iterations to converge.
+            EEGt = iclabel(EEGt);
+            EEGt = pop_icflag(EEGt, [NaN NaN;0.6 1;0.6 1;0.6 1;0.6 1;0.6 1;0.6 1]);
         end
 
         if do_dipolefit
