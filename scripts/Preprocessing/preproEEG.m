@@ -1,21 +1,22 @@
 function preproEEG(varargin)
-
     eeglab;
 
     % Create an instance of the inputParser class
     p = inputParser;
 
     % Define the mandatory arguments
+    addRequired(p,'dataPath', @ischar);
     addRequired(p, 'pathIn', @ischar);
     addRequired(p, 'nameOut', @ischar);
     addRequired(p, 'idNum', @ischar);
     addRequired(p, 'type_of_pp', @ischar);
+    addRequired(p, 'ChanLocsBesa', @ischar);
 
     % Define optional arguments with default values
     addParameter(p, 'PE', false, @islogical);
     addParameter(p, 'ICA_reject', true, @islogical);
     addParameter(p, 'ASR', true, @islogical);
-    addParameter(p, 'Cleanline', false, @islogical); % not implemented yet
+    addParameter(p, 'Cleanline', false, @islogical); %Not implemented
     addParameter(p, 'Filt60Hz', true, @islogical);
     addParameter(p, 'Interpolate', true, @islogical);
     addParameter(p, 'GlobalRef', false, @islogical);
@@ -24,9 +25,11 @@ function preproEEG(varargin)
     parse(p, varargin{:});
 
     % Access the parsed values
+    dataPath = p.Results.dataPath;
     type_of_pp = p.Results.type_of_pp;
     pathIn = p.Results.pathIn;
     idNum = p.Results.idNum;
+    ChanLocsBesa = p.Results.ChanLocsBesa;
     nameOutpp = p.Results.nameOut;
     PE = p.Results.PE;
     ICA_reject = p.Results.ICA_reject;
@@ -50,7 +53,7 @@ function preproEEG(varargin)
         EEG.chanlocs(ch).labels = cell2mat(channels(ch));
     end
     EEG = pop_select( EEG, 'rmchannel',{'Gyro 1','Gyro 2','Gyro 3'});
-    EEG = pop_chanedit(EEG, 'lookup','D:\NYNGroup\eeglab2023\plugins\dipfit\standard_BESA\standard-10-5-cap385.elp');
+    EEG = pop_chanedit(EEG, 'lookup',ChanLocsBesa);
 % (4) Re-referenciación
     EEG = pop_reref( EEG, [20 21] ); 
     if do_GlobalRef
@@ -69,17 +72,14 @@ function preproEEG(varargin)
         EEG = pop_firws(EEG, 'fcutoff', [59 61], 'ftype', 'bandstop', 'wtype',...
             'hamming', 'forder', 3300, 'minphase', 0, 'usefftfilt', 0, ...
             'plotfresp', 0, 'causal', 0); % Transition width of 0.5 Hz
-    end
-
-    if do_Cleanline
-        %do cleanline
+    elseif do_Cleanline
+        %Not implemented to use cleanline
     end
 % (6.1) Rename Epochs to perceived
  if (PE) 
     Events = {'33028' , '33029' , '33030' , '33031',...
             '33032' , '33033'  ,'33034',  '33035',...
             '33024' , '33025' , '33026' , '33027', '19999'};
-    dataPath = 'D:\shared_git\MaestriaThesis\data';
     file_path = fullfile(dataPath,idNum,['R_', idNum, '.txt']);
     
     % Read the entire file as a string
@@ -107,7 +107,7 @@ function preproEEG(varargin)
  end
 % (6.2) Remove occasional large-amplitude noise/artifacts
     if do_Interpolate
-        chanlocs_original = EEG.chanlocs; Necessary for interpolation
+        chanlocs_original = EEG.chanlocs; %Necessary for interpolation
     end
     if do_ASR
         [EEG,~,~] = clean_artifacts(EEG,'ChannelCriterion',0.65);

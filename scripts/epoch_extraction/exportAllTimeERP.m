@@ -39,4 +39,4 @@ for type = 1:12
     end
 end
 
-writematrix(output_mat, 'output_mat.csv');
+writematrix(output_mat, fullfile('D:\shared_git\MaestriaThesis\FeaturesTabs',[type_of_pp, '_t1.csv']));

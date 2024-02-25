@@ -1,107 +1,109 @@
 addpath("D:\NYNGroup\eeglab2023.1\");
 clear;
+rng default 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Generate PP01 .set data (preprocessed)
+%% Generate PPValidation .set data (preprocessed)
+% CONFIGURATION VARIABLES
+type_of_pp  = 'pp_validation';
+dataPath    = 'D:\shared_git\MaestriaThesis\NeuroSenseDatabase';
+ChanLocsBesa = 'D:\NYNGroup\eeglab2023\plugins\dipfit\standard_BESA\standard-10-5-cap385.elp';
+PE          = false;                    
+ICA_reject  = false;              
+ASR         = true;                     
+Cleanline   = false;             
+Filt60Hz    = true;                
+Interpolate = false; 
+GlobalRef   = true;
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+tic
+parfor id = 1:34
+    % Format 'i' with leading zeros (e.g., sub-01, sub-02, etc.)
+    sub_id = sprintf('sub-%02d', id);
+    nameInE = fullfile(dataPath, sub_id, 'eeg', [sub_id '_E.edf']);
+    nameOutpp = fullfile(dataPath, sub_id, type_of_pp, [sub_id, '_E_' , type_of_pp , '.set']);
+    
+    mkdir(fullfile(dataPath, sub_id, type_of_pp))
+    if exist(nameInE, 'file') == 2     
+        % input file exists
+        disp("Processing " + sub_id);
+        preproEEG( dataPath,...
+            nameInE,        ...
+            nameOutpp,           ...
+            sub_id, ...
+            type_of_pp,...
+            ChanLocsBesa, ...
+            'PE', PE,                    ...
+            'ICA_reject',ICA_reject,              ...
+            'ASR',ASR,                     ...
+            'Cleanline', Cleanline,             ...
+            'Filt60Hz', Filt60Hz,               ...
+            'Interpolate',Interpolate,            ...
+            'GlobalRef',GlobalRef);
+    else
+        % file doesn't exist
+        disp("Skipping " + nameInE + " - file does not exist.");
+    end
+end
+ 
+%% Preprocessing of basal data
+parfor id = 1:34
+    % Format 'i' with leading zeros (e.g., sub-01, sub-02, etc.)
+    sub_id = sprintf('sub-%02d', id);
+    nameInE = fullfile(dataPath, sub_id, 'eeg', [sub_id '_B.edf']);
+    nameOutpp = fullfile(dataPath, sub_id, type_of_pp, [sub_id, '_B_' , type_of_pp , '.set']);
+    if exist(nameInE, 'file') == 2 
+        % input file exists
+        disp("Processing " + sub_id);
+        preproEEG( dataPath,...
+            nameInE,        ...
+            nameOutpp,           ...
+            sub_id, ...
+            type_of_pp,...
+            ChanLocsBesa, ...
+            'PE', PE,                    ...
+            'ICA_reject',ICA_reject,              ...
+            'ASR',ASR,                     ...
+            'Cleanline', Cleanline,             ...
+            'Filt60Hz', Filt60Hz,               ...
+            'Interpolate',Interpolate,            ...
+            'GlobalRef',GlobalRef);
+    else
+        % file doesn't exist
+        disp("Skipping " + nameInE + " - file does not exist.");
+    end
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Generate pp01 .set data (preprocessed)
 % CONFIGURATION VARIABLES
 type_of_pp  = 'pp01';
-dataPath    = 'D:\shared_git\MaestriaThesis\data';
+dataPath    = 'D:\shared_git\MaestriaThesis\NeuroSenseDatabase';
+ChanLocsBesa = 'D:\NYNGroup\eeglab2023\plugins\dipfit\standard_BESA\standard-10-5-cap385.elp';
 PE          = false;                    
-ICA_reject  = true;              
+ICA_reject  = false;              
 ASR         = true;                     
 Cleanline   = false;             
 Filt60Hz    = true;                
 Interpolate = false; 
-GlobalRef   = false;
+GlobalRef   = true;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 tic
-parfor i = 12:50
-    % Format 'i' with leading zeros (e.g., ID01, ID02, etc.)
-    id_str = sprintf('ID%02d', i);
-
-    nameInE = fullfile(dataPath, id_str, ['E_' id_str '.edf']);
-    nameOutpp = fullfile(dataPath, id_str, type_of_pp, ['E_', id_str, '_' , type_of_pp , '.set']);
-    mkdir(fullfile(dataPath, id_str, type_of_pp))
-    if exist(nameInE, 'file') == 2 
-        
-        % input file exists
-        disp("Processing " + id_str);
-        preproEEG( nameInE,        ...
-            nameOutpp,           ...
-            id_str, ...
-            type_of_pp,...
-            'PE', PE,                    ...
-            'ICA_reject',ICA_reject,              ...
-            'ASR',ASR,                     ...
-            'Cleanline', Cleanline,             ...
-            'Filt60Hz', Filt60Hz,               ...
-            'Interpolate',Interpolate,            ...
-            'GlobalRef',GlobalRef);
-    else
-        % file doesn't exist
-        disp("Skipping " + nameInE + " - file does not exist.");
-    end
-end
-%%
-% Generate PP .set data of basal data (preprocessed)
-parfor i = 12:50
-    % Format 'i' with leading zeros (e.g., ID01, ID02, etc.)
-    id_str = sprintf('ID%02d', i);
-
-    nameInE = fullfile(dataPath, id_str, ['B_' id_str '.edf']);
-    nameOutpp = fullfile(dataPath, id_str, type_of_pp, ['B_', id_str, '_' , type_of_pp , '.set']);
-    mkdir(fullfile(dataPath, id_str, type_of_pp))
-    if exist(nameInE, 'file') == 2 
-        % input file exists
-        disp("Processing " + id_str);
-        preproEEG( nameInE,        ...
-            nameOutpp,           ...
-            id_str, ...
-            type_of_pp,...
-            'PE', PE,                    ...
-            'ICA_reject',ICA_reject,              ...
-            'ASR',ASR,                     ...
-            'Cleanline', Cleanline,             ...
-            'Filt60Hz', Filt60Hz,               ...
-            'Interpolate',Interpolate,            ...
-            'GlobalRef',GlobalRef);
-    else
-        % file doesn't exist
-        disp("Skipping " + nameInE + " - file does not exist.");
-    end
-end
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Generate pp02 .set data (perceived epoch preprocessed) 
-% CONFIGURATION VARIABLES
-type_of_pp  = 'pp02';
-dataPath    = 'D:\shared_git\MaestriaThesis\data';
-PE          = true;                    
-ICA_reject  = true;              
-ASR         = true;                     
-Cleanline   = false;             
-Filt60Hz    = true;               
-Interpolate = false; 
-GlobalRef   = false;
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-[~,~,~] = eeglab;
-parfor i = 12:50
-    id_str = sprintf('ID%02d', i);
+parfor id = 1:34
+    % Format 'i' with leading zeros (e.g., sub-01, sub-02, etc.)
+    sub_id = sprintf('sub-%02d', id);
+    nameInE = fullfile(dataPath, sub_id, 'eeg', [sub_id '_E.edf']);
+    nameOutpp = fullfile(dataPath, sub_id, type_of_pp, [sub_id, '_E_' , type_of_pp , '.set']);
     
-    nameInE = fullfile(dataPath, id_str, ['E_' id_str '.edf']);
-    nameOutpp = fullfile(dataPath, id_str, type_of_pp, ['E_', id_str, '_' , type_of_pp , '.set']);
-    try
-        rmdir(fullfile(dataPath, id_str, type_of_pp), 's')
-    catch
-    end
-    mkdir(fullfile(dataPath, id_str, type_of_pp))
-    if exist(nameInE, 'file') == 2 
+    mkdir(fullfile(dataPath, sub_id, type_of_pp))
+    if exist(nameInE, 'file') == 2     
         % input file exists
-        disp("Processing " + id_str);
-        preproEEG( nameInE,        ...
+        disp("Processing " + sub_id);
+        preproEEG( dataPath,...
+            nameInE,        ...
             nameOutpp,           ...
-            id_str, ...
+            sub_id, ...
             type_of_pp,...
+            ChanLocsBesa, ...
             'PE', PE,                    ...
             'ICA_reject',ICA_reject,              ...
             'ASR',ASR,                     ...
@@ -114,76 +116,22 @@ parfor i = 12:50
         disp("Skipping " + nameInE + " - file does not exist.");
     end
 end
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Generate PP03 .set data (preprocessed)
-% CONFIGURATION VARIABLES
-type_of_pp  = 'pp03';
-dataPath    = 'D:\shared_git\MaestriaThesis\data';
-PE          = false;                    
-ICA_reject  = false;              
-ASR         = true;                     
-Cleanline   = false;             
-Filt60Hz    = true;                
-Interpolate = false; 
-GlobalRef   = true;
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-tic
-parfor i = 12:50
-    % Format 'i' with leading zeros (e.g., ID01, ID02, etc.)
-    id_str = sprintf('ID%02d', i);
-
-    nameInE = fullfile(dataPath, id_str, ['E_' id_str '.edf']);
-    nameOutpp = fullfile(dataPath, id_str, type_of_pp, ['E_', id_str, '_' , type_of_pp , '.set']);
-    mkdir(fullfile(dataPath, id_str, type_of_pp))
-    if exist(nameInE, 'file') == 2 
-        
-        % input file exists
-        disp("Processing " + id_str);
-        preproEEG( nameInE,        ...
-            nameOutpp,           ...
-            id_str, ...
-            type_of_pp,...
-            'PE', PE,                    ...
-            'ICA_reject',ICA_reject,              ...
-            'ASR',ASR,                     ...
-            'Cleanline', Cleanline,             ...
-            'Filt60Hz', Filt60Hz,               ...
-            'Interpolate',Interpolate,            ...
-            'GlobalRef',GlobalRef);
-    else
-        % file doesn't exist
-        disp("Skipping " + nameInE + " - file does not exist.");
-    end
-end
-
-%% Generate PP .set data of basal data (preprocessed)
-% Generate PP03 .set data (preprocessed)
-% CONFIGURATION VARIABLES
-type_of_pp  = 'pp03';
-dataPath    = 'D:\shared_git\MaestriaThesis\data';
-PE          = false;                    
-ICA_reject  = false;              
-ASR         = true;                     
-Cleanline   = false;             
-Filt60Hz    = true;                
-Interpolate = false; 
-GlobalRef   = true;
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-tic
-parfor i = 12:50
-    % Format 'i' with leading zeros (e.g., ID01, ID02, etc.)
-    id_str = sprintf('ID%02d', i);
-
-    nameInE = fullfile(dataPath, id_str, ['B_' id_str '.edf']);
-    nameOutpp = fullfile(dataPath, id_str, type_of_pp, ['B_', id_str, '_' , type_of_pp , '.set']);
-    mkdir(fullfile(dataPath, id_str, type_of_pp))
+ 
+%% Preprocessing of basal data
+parfor id = 1:34
+    % Format 'i' with leading zeros (e.g., sub-01, sub-02, etc.)
+    sub_id = sprintf('sub-%02d', id);
+    nameInE = fullfile(dataPath, sub_id, 'eeg', [sub_id '_B.edf']);
+    nameOutpp = fullfile(dataPath, sub_id, type_of_pp, [sub_id, '_B_' , type_of_pp , '.set']);
     if exist(nameInE, 'file') == 2 
         % input file exists
-        disp("Processing " + id_str);
-        preproEEG( nameInE,        ...
+        disp("Processing " + sub_id);
+        preproEEG( dataPath,...
+            nameInE,        ...
             nameOutpp,           ...
-            id_str, ...
+            sub_id, ...
             type_of_pp,...
+            ChanLocsBesa, ...
             'PE', PE,                    ...
             'ICA_reject',ICA_reject,              ...
             'ASR',ASR,                     ...
