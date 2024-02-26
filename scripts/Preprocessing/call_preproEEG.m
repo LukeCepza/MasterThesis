@@ -118,6 +118,7 @@ parfor id = 1:34
 end
  
 %% Preprocessing of basal data
+tic
 parfor id = 1:34
     % Format 'i' with leading zeros (e.g., sub-01, sub-02, etc.)
     sub_id = sprintf('sub-%02d', id);

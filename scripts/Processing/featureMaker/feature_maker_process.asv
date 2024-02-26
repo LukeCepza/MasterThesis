@@ -14,7 +14,6 @@ function EEG = feature_maker_process(varargin)
     addParameter(p, 'ICA_reject',  true, @islogical);
     addParameter(p, 'recomp_ICA',  true, @islogical);
     addParameter(p, 'LapReference', false, @islogical);
-    addParameter(p, 'basal_eeg', false, @islogical);
 
     % Parse the input arguments
     parse(p, varargin{:});
@@ -28,7 +27,6 @@ function EEG = feature_maker_process(varargin)
     ICA_reject = p.Results.ICA_reject;
     LapReference = p.Results.LapReference;
     recomp_ICA = p.Results.recomp_ICA;
-    basal_eeg = p.Results.basal_eeg;
 
     EEG = pop_loadset('filename', nameInE, 'filepath', nameInEPath);    
 
@@ -36,7 +34,7 @@ function EEG = feature_maker_process(varargin)
         channels = {EEG.chanlocs.labels}';
         % Laplacian reference
         data = reshape([EEG.data],EEG.nbchan,[],1);
-        if basal_eeg
+        if ICA_reject
             EEG.data = applyLaplacianReference(EEG.data, channels);
         else
             EEG.data = reshape(applyLaplacianReference(data, channels), EEG.nbchan,1250,[]);

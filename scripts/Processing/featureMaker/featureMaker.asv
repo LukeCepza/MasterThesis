@@ -46,13 +46,17 @@ end
 %###% Export times
 %output_mat = output_mat(2:end,:);
 writematrix(output_mat, fullfile('D:\shared_git\MaestriaThesis\FeaturesTabs',[type_of_pp, '_t1.csv']));
-%% %###% PSD
-[pxx,f] = pwelch(output_mat(:,5:end)', 250,125,freqs, 250);
+
+%%
+
+%###% PSD
+%%
+[pxx,freqs] = pwelch(output_mat(:,5:end)', 500,250,[], 250);
 output_pxx = [output_mat(:,1:4),pxx'];
-plot(freqs, 10*log10(output_pxx(1:10:2000,5:end)))
+plot(freqs, 10*log10(output_pxx(1:100:2000,5:end)))
 %%
 writematrix(output_pxx, fullfile('D:\shared_git\MaestriaThesis\FeaturesTabs',[type_of_pp, '_t2.csv']));
-%%
+
 output_pxx_base = zeros(1,261);
 basal_eeg = true;
 for id = 1:34
@@ -69,7 +73,7 @@ for id = 1:34
                     'recomp_ICA',recomp_ICA,              ...
                     'LapReference',LapReference, ...
                     'basal_eeg',basal_eeg);
-            [pxx,f] = pwelch(EEG.data, 2500,1250,freqs, 250);
+            [pxx,f] = pwelch(EEG.data, 250,125,freqs, 250);
             rows_num = min(size(pxx));
             data = ones(rows_num,1)*[chan,id,13];
             output_pxx_base = cat(1,output_pxx_base, [data, [1:rows_num]', pxx']);
@@ -80,9 +84,11 @@ for id = 1:34
 end
 %%
 output_pxx_base_rep = output_pxx_base(output_pxx(:,2),:);
-output_pxx_normdb =  output_pxx(:,5:end)./output_pxx_base_rep(:,5:end);
-output_pxx_normdb = [output_pxx(:,1:4),output_pxx_normdb];
-plot(freqs, output_pxx_normdb(1:10:2000,5:end))
 
-%% %###% Normalized PSD
+output_pxx_normdb =  10*log10(output_pxx(:,5:end)./output_pxx_base_rep(:,5:end));
+output_pxx_normdb = [output_pxx(:,1:4),output_pxx_normdb];
+plot(freqs, output_pxx_base_rep(1:100:2000,5:end))
+
+%%
+%###% Normalized PSD
 writematrix(output_pxx_normdb, fullfile('D:\shared_git\MaestriaThesis\FeaturesTabs',[type_of_pp, '_t3.csv']));
