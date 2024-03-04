@@ -40,6 +40,23 @@ D2 = mode(ids(ids(1:10)' ~= 0));
 ids(ids == D2) = 0;
 D3 = mode(ids(ids(1:15)'~= 0));
 
+%%
+tag = [EEG.event.edftype];
+tag = tag(1:2:end) -4;
+exp = ones(length(tag), 4);
+exp(:,3) = tag;
+exp(:,1) = 5;
+
+IC_obs = squeeze(mean(EEG.icaact,1));
+exp = [exp,IC_obs'];
+
+writematrix(exp, fullfile('D:\shared_git\MaestriaThesis\FeaturesTabs','pp01_t7.csv'));
+%%
+
+[pxx,freqs] = pwelch(exp(:,5:end)', 250,125,[], 250);
+output_pxx = [exp(:,1:4),pxx'];
+writematrix(output_pxx, fullfile('D:\shared_git\MaestriaThesis\FeaturesTabs','pp01_t8.csv'));
+
 function Aids = get_minidx(A)
     Aids = zeros(length(A),1);
     for i = 1:length(A)
