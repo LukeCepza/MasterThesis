@@ -3,11 +3,14 @@
 % CONFIGURATION VARIABLES
 dataPath     = 'D:\shared_git\MaestriaThesis\NeuroSenseDatabase';
 type_of_pp   = 'pp01';
-ICA_reject   = false;
+ICA_reject   = true;
 recomp_ICA   = false;
 LapReference = false;
 do_dwtEnergy = false;
-do_dwtEnergy_tf = true;
+do_dwtEnergy_tf = false;
+do_dwtHuffman = True;
+interpolate = true;
+
 listStimuli  = {'Air1','Air2','Air3','Air4',...
                'Vib1','Vib2','Vib3','Vib4',...
                'Car1','Car2','Car3','Car4'};
@@ -15,7 +18,7 @@ channels     = {'Fp1';'Fp2';'F3'; 'F4';'C3';'C4';'P3'; ...
                 'P4';'O1';'O2';'F7';'F8';'T7';'T8';'P7'; ...
                 'P8';'Fz';'Cz';'Pz';'AFz';'CPz'; 'POz'};
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-output_mat = zeros(1,660+4);
+output_mat = zeros(1,22+4);
 for type = 1:12
     tstimul = listStimuli{type};
     for id = 1:34
@@ -23,40 +26,45 @@ for type = 1:12
         nameInE = [sub_id, '_' , type_of_pp , '_e', tstimul ,'.set'];
         nameInEPath = fullfile(dataPath, sub_id, type_of_pp, tstimul);
         for chan = 5
-            try
+            %try
                 EEG = feature_maker_process( nameInE,        ...
                         nameInEPath, ...
                         chan, ...
+                        'interpolate', interpolate, ...
                         'ICA_reject',ICA_reject,              ...
                         'recomp_ICA',recomp_ICA,              ...
                         'LapReference',LapReference, ...
-                        'do_dwtEnergy_tf', do_dwtEnergy_tf);
+                        'do_dwtEnergy', do_dwtEnergy ...
+                        'do_dwtHuffman', do_dwtHuffman);
 
-                epoch = EEG.dwt_feats;
+                epoch = EEG.dwtHuffman;
                 rows_num = min(size(epoch));
                 data = ones(rows_num,1)*[chan,id,type];
                 output_mat = cat(1,output_mat, [data, [1:rows_num]', epoch]);
-            catch
+            %catch
                 disp("Channel " + channels{chan} + " not found at" + nameInE)
-            end
+            %end
         end
     end
 end
 % Export data
 %###% Export times
 output_mat = output_mat(2:end,:);
-writematrix(output_mat, fullfile('D:\shared_git\MaestriaThesis\FeaturesTabs',[type_of_pp, '_t15.csv']));
-% 
-% 
+writematrix(output_mat, fullfile('D:\shared_git\MaestriaThesis\FeaturesTabs',[type_of_pp, '_t18.csv']));
+
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % %% Generate pp01 .set data (preprocessed) eval1
 % % CONFIGURATION VARIABLES
 % dataPath     = 'D:\shared_git\MaestriaThesis\NeuroSenseDatabase';
 % type_of_pp   = 'pp01';
-% ICA_reject   = false;
+% ICA_reject   = true;
 % recomp_ICA   = false;
-% LapReference = false;
+% LapReference = true;
 % do_dwtEnergy = true;
+% do_dwtEnergy_tf = false;
+% 
+% interpolate = true;
+% 
 % listStimuli  = {'Air1','Air2','Air3','Air4',...
 %                'Vib1','Vib2','Vib3','Vib4',...
 %                'Car1','Car2','Car3','Car4'};
@@ -64,7 +72,6 @@ writematrix(output_mat, fullfile('D:\shared_git\MaestriaThesis\FeaturesTabs',[ty
 %                 'P4';'O1';'O2';'F7';'F8';'T7';'T8';'P7'; ...
 %                 'P8';'Fz';'Cz';'Pz';'AFz';'CPz'; 'POz'};
 % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% 
 % output_mat = zeros(1,132+4);
 % for type = 1:12
 %     tstimul = listStimuli{type};
@@ -73,10 +80,11 @@ writematrix(output_mat, fullfile('D:\shared_git\MaestriaThesis\FeaturesTabs',[ty
 %         nameInE = [sub_id, '_' , type_of_pp , '_e', tstimul ,'.set'];
 %         nameInEPath = fullfile(dataPath, sub_id, type_of_pp, tstimul);
 %         for chan = 5
-%             try
+%             %try
 %                 EEG = feature_maker_process( nameInE,        ...
 %                         nameInEPath, ...
 %                         chan, ...
+%                         'interpolate', interpolate, ...
 %                         'ICA_reject',ICA_reject,              ...
 %                         'recomp_ICA',recomp_ICA,              ...
 %                         'LapReference',LapReference, ...
@@ -86,15 +94,114 @@ writematrix(output_mat, fullfile('D:\shared_git\MaestriaThesis\FeaturesTabs',[ty
 %                 rows_num = min(size(epoch));
 %                 data = ones(rows_num,1)*[chan,id,type];
 %                 output_mat = cat(1,output_mat, [data, [1:rows_num]', epoch]);
-%             catch
+%             %catch
 %                 disp("Channel " + channels{chan} + " not found at" + nameInE)
-%             end
+%             %end
 %         end
 %     end
 % end
-% 
-% %% Export data
+% % Export data
 % %###% Export times
-% %output_mat = output_mat(2:end,:);
-% writematrix(output_mat, fullfile('D:\shared_git\MaestriaThesis\FeaturesTabs',[type_of_pp, '_t13.csv']));
-% 
+% output_mat = output_mat(2:end,:);
+% writematrix(output_mat, fullfile('D:\shared_git\MaestriaThesis\FeaturesTabs',[type_of_pp, '_t17.csv']));
+% % 
+% % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% % %% Generate pp01 .set data (preprocessed) eval1
+% % % CONFIGURATION VARIABLES
+% % dataPath     = 'D:\shared_git\MaestriaThesis\NeuroSenseDatabase';
+% % type_of_pp   = 'pp01';
+% % ICA_reject   = false;
+% % recomp_ICA   = false;
+% % LapReference = false;
+% % do_dwtEnergy = false;
+% % do_dwtEnergy_tf = true;
+% % listStimuli  = {'Air1','Air2','Air3','Air4',...
+% %                'Vib1','Vib2','Vib3','Vib4',...
+% %                'Car1','Car2','Car3','Car4'};
+% % channels     = {'Fp1';'Fp2';'F3'; 'F4';'C3';'C4';'P3'; ...
+% %                 'P4';'O1';'O2';'F7';'F8';'T7';'T8';'P7'; ...
+% %                 'P8';'Fz';'Cz';'Pz';'AFz';'CPz'; 'POz'};
+% % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% % output_mat = zeros(1,660+4);
+% % for type = 1:12
+% %     tstimul = listStimuli{type};
+% %     for id = 1:34
+% %         sub_id = sprintf('sub-%02d', id);
+% %         nameInE = [sub_id, '_' , type_of_pp , '_e', tstimul ,'.set'];
+% %         nameInEPath = fullfile(dataPath, sub_id, type_of_pp, tstimul);
+% %         for chan = 5
+% %             try
+% %                 EEG = feature_maker_process( nameInE,        ...
+% %                         nameInEPath, ...
+% %                         chan, ...
+% %                         'ICA_reject',ICA_reject,              ...
+% %                         'recomp_ICA',recomp_ICA,              ...
+% %                         'LapReference',LapReference, ...
+% %                         'do_dwtEnergy_tf', do_dwtEnergy_tf);
+% % 
+% %                 epoch = EEG.dwt_feats;
+% %                 rows_num = min(size(epoch));
+% %                 data = ones(rows_num,1)*[chan,id,type];
+% %                 output_mat = cat(1,output_mat, [data, [1:rows_num]', epoch]);
+% %             catch
+% %                 disp("Channel " + channels{chan} + " not found at" + nameInE)
+% %             end
+% %         end
+% %     end
+% % end
+% % % Export data
+% % %###% Export times
+% % output_mat = output_mat(2:end,:);
+% % writematrix(output_mat, fullfile('D:\shared_git\MaestriaThesis\FeaturesTabs',[type_of_pp, '_t15.csv']));
+% % % 
+% % % 
+% % % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% % % %% Generate pp01 .set data (preprocessed) eval1
+% % % % CONFIGURATION VARIABLES
+% % % dataPath     = 'D:\shared_git\MaestriaThesis\NeuroSenseDatabase';
+% % % type_of_pp   = 'pp01';
+% % % ICA_reject   = false;
+% % % recomp_ICA   = false;
+% % % LapReference = false;
+% % % do_dwtEnergy = true;
+% % % listStimuli  = {'Air1','Air2','Air3','Air4',...
+% % %                'Vib1','Vib2','Vib3','Vib4',...
+% % %                'Car1','Car2','Car3','Car4'};
+% % % channels     = {'Fp1';'Fp2';'F3'; 'F4';'C3';'C4';'P3'; ...
+% % %                 'P4';'O1';'O2';'F7';'F8';'T7';'T8';'P7'; ...
+% % %                 'P8';'Fz';'Cz';'Pz';'AFz';'CPz'; 'POz'};
+% % % %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% % % 
+% % % output_mat = zeros(1,132+4);
+% % % for type = 1:12
+% % %     tstimul = listStimuli{type};
+% % %     for id = 1:34
+% % %         sub_id = sprintf('sub-%02d', id);
+% % %         nameInE = [sub_id, '_' , type_of_pp , '_e', tstimul ,'.set'];
+% % %         nameInEPath = fullfile(dataPath, sub_id, type_of_pp, tstimul);
+% % %         for chan = 5
+% % %             try
+% % %                 EEG = feature_maker_process( nameInE,        ...
+% % %                         nameInEPath, ...
+% % %                         chan, ...
+% % %                         'ICA_reject',ICA_reject,              ...
+% % %                         'recomp_ICA',recomp_ICA,              ...
+% % %                         'LapReference',LapReference, ...
+% % %                         'do_dwtEnergy', do_dwtEnergy);
+% % % 
+% % %                 epoch = EEG.dwt_feats;
+% % %                 rows_num = min(size(epoch));
+% % %                 data = ones(rows_num,1)*[chan,id,type];
+% % %                 output_mat = cat(1,output_mat, [data, [1:rows_num]', epoch]);
+% % %             catch
+% % %                 disp("Channel " + channels{chan} + " not found at" + nameInE)
+% % %             end
+% % %         end
+% % %     end
+% % % end
+% % % 
+% % % %% Export data
+% % % %###% Export times
+% % % %output_mat = output_mat(2:end,:);
+% % % writematrix(output_mat, fullfile('D:\shared_git\MaestriaThesis\FeaturesTabs',[type_of_pp, '_t13.csv']));
+% % % 

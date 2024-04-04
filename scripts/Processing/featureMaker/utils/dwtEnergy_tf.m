@@ -12,7 +12,7 @@ function EEG = dwtEnergy_tf(EEG)
     E_t = zeros(6*5,1);
     for epoch = 1:epoch_len
         for chan = 1:length(channels)
-            try
+            %try
                 idx = find(strcmp(channels, EEGchannels{chan}));
                 signal = squeeze(EEG.data(idx,:,:));
                 signal = signal(:,epoch);
@@ -28,9 +28,8 @@ function EEG = dwtEnergy_tf(EEG)
                 E_tt = sum(E_t);
                 E_t_rel = E_t./E_tt;
                 F_sub(epoch,(-29:0)+5*6*chan) = E_t_rel;
-            catch
-            end
-
+            %catch
+            %end
         end  
     end
     EEG.dwt_feats = F_sub;

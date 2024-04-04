@@ -6,7 +6,7 @@
 % A1        0 (DC)              3.906250
 samplingRate = 200; % Replace with your actual EEG sampling rate
 waveletName = 'bior1.3';
-level = 8; % Number of levels in the wavelet decomposition
+level = 5; % Number of levels in the wavelet decomposition
 
 frequencyBands = zeros(level, 2); % Initialize matrix to hold frequency bands for each level
 

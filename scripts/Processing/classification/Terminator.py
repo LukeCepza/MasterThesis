@@ -3,6 +3,15 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 from scipy.signal import butter, filtfilt, resample
+import scipy.stats as stats
+import os
+import statsmodels.api as sm
+
+from sklearn.model_selection import train_test_split, KFold
+from sklearn.metrics import mean_squared_error
+
+from ITMO_FS.wrappers import RecursiveElimination
+from sklearn.svm import SVC
 
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.ensemble import RandomForestClassifier
@@ -10,34 +19,32 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.decomposition import PCA
 from sklearn.svm import SVC
+from sklearn.preprocessing import StandardScaler
 
-from sklearn.model_selection import train_test_split, GridSearchCV, cross_val_score, cross_validate
+from sklearn.model_selection import train_test_split, GridSearchCV, cross_validate
 from sklearn.feature_selection import mutual_info_classif
 from sklearn.metrics import accuracy_score, confusion_matrix
 
 class Terminator:
-    def __init__(self, filename,feature_select = 'entropy', Hyperparam = False, method = 'dwt_energy', 
+    def __init__(self, filename, method = 'dwt_energy',  standarize = False,
                  Types = [1,2,3,4,5,6,7,8,9,10,11,12], mod = ['Air','Air','Air','Air','Vib','Vib','Vib','Vib','Car','Car','Car','Car']):          
 
-        if method == 'dwt_energy':
-            self.read_dwt(filename, mod, Types)
+        if method == 'dwt_energy': self.read_dwt(filename, mod, Types)
+        elif method == 'dwt_energy_tf': self.read_dwt_tf(filename, mod, Types,window_num = 5)
         else:
             self.read_data(filename)
             self.filter_data(5, Types)
             self.class_generator(mod)
+        self.create_traintest()
+        if standarize: self.standarize()            
 
-        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.data_array, 
-                                                                                    self.class_labels, test_size=0.2, random_state=42)      
-        self.MLP_train(validation='kfold', hidden_layer_sizes=(200,100,50,20,10,), max_iter = 10000)
- 
-        if feature_select == 'entropy':
-            self.feature_select_entropy(threshold=0.001, echo = False, plot = True, number_of_f = 70)
-            self.MLP_train(validation='kfold', hidden_layer_sizes=(200,100,50,20,10,), max_iter = 10000)
-        if Hyperparam:     
-            self.HyperParametrizeMLP()
-        #    self.HyperParametrizeKNN()
 
 ## Preprocessing
+    def standarize(self):
+        scaler = StandardScaler()
+        scaler.fit(self.data_array)
+        standardized_data = scaler.transform(self.data_array)
+        self.df.iloc[:, 1:] = standardized_data       
 
     def read_data(self, filename):
         self.df = pd.read_csv(filename)
@@ -58,10 +65,39 @@ class Terminator:
             class_labels[class_labels == i] = replacement
         self.class_labels = class_labels
 
-    def read_dwt(self, filename, mod, Types):
+    def create_traintest(self):
+        self.data_array = self.df.drop(['Class'], axis=1).values
+        self.class_labels = self.df['Class'].values
+        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.data_array, 
+                                                                                    self.class_labels, test_size=0.2, random_state=42)
+
+    def read_dwt_tf(self, filename, mod, Types, window_num = 5):
         self.df = pd.read_csv(filename)
         self.df.replace([np.inf, -np.inf], np.nan, inplace=True)
         self.df.dropna(inplace=True)
+
+        channels = ['Fp1', 'Fp2', 'F3', 'F4', 'C3', 'C4', 'P3', 'P4', 'O1', 'O2', 'F7', 'F8', 'T7', 'T8', 'P7', 'P8', 'Fz', 'Cz', 'Pz', 'AFz', 'CPz', 'POz']
+        patterns = ['d1', 'd2', 'd3', 'd4', 'd5', 'a1']
+         
+        times = np.arange(-1000, 4000, 5000/window_num)
+        column_names = ['channels', 'ID', 'Class', 'Epoch'] + [f"{ch}_{pt}_{t}" for ch in channels for pt in patterns for t in times]
+
+        if len(column_names) != len(self.df.columns):
+            raise ValueError(f"Number of column names ({len(column_names)}) does not match number of columns in DataFrame ({len(self.df.columns)})")
+ 
+        self.df.columns = column_names
+
+        class_mapping = dict(zip(Types, mod))
+        self.df['Class'] = self.df['Class'].map(class_mapping)
+        self.df = self.df.drop(columns=['channels', 'ID', 'Epoch'])
+
+        self.data_array = self.df.drop(['Class'], axis=1).values
+        self.class_labels = self.df['Class'].values
+        pass
+
+    def read_dwt(self, filename, mod, Types):
+        self.df = pd.read_csv(filename)
+        self.df.replace([np.inf, -np.inf], np.nan, inplace=True)
 
         channels = ['Fp1', 'Fp2', 'F3', 'F4', 'C3', 'C4', 'P3', 'P4', 'O1', 'O2', 'F7', 'F8', 'T7', 'T8', 'P7', 'P8', 'Fz', 'Cz', 'Pz', 'AFz', 'CPz', 'POz']
         patterns = ['_d1', '_d2', '_d3', '_d4', '_d5', '_a1']
@@ -71,6 +107,8 @@ class Terminator:
             raise ValueError(f"Number of column names ({len(column_names)}) does not match number of columns in DataFrame ({len(self.df.columns)})")
 
         self.df.columns = column_names
+
+        self.df = self.df[self.df['Class'].isin(Types)]
 
         class_mapping = dict(zip(Types, mod))
         self.df['Class'] = self.df['Class'].map(class_mapping)
@@ -88,18 +126,14 @@ class Terminator:
         downsample_factor = int(fs_original / fs_downsampled)
         self.downsampled_data_array = resample(filtered_data_array, len(filtered_data_array[0]) // downsample_factor, axis=1)
 
-## Feature Selection
-
-    def feature_select_entropy(self, threshold=0.001, echo=True, plot = True, number_of_f = 0):
+## Feat    def feature_select_entropy(self, threshold=0.001, echo=True, plot = True, number_of_f = 0):
         print("Selecting features based on mutual information")
         mutual_info_scores = mutual_info_classif(np.vstack((self.X_train, self.X_test)), np.concatenate((self.y_train, self.y_test)))
 
         if number_of_f > 0:
-            # Select the top number_of_f features based on mutual information
             sorted_indices = np.argsort(mutual_info_scores)[::-1]
             selected_features = sorted_indices[:number_of_f]
         else:
-            # Select features based on the threshold
             selected_features = np.where(mutual_info_scores > threshold)[0]
 
         channels = ['Fp1', 'Fp2', 'F3', 'F4', 'C3', 'C4', 'P3', 'P4', 'O1', 'O2', 'F7', 'F8', 'T7', 'T8', 'P7', 'P8', 'Fz', 'Cz', 'Pz', 'AFz', 'CPz', 'POz']
@@ -164,7 +198,7 @@ class Terminator:
         # Update X_train and X_test to only include selected features
         self.X_train = self.X_train[:, sorted_feature_indices]
         self.X_test = self.X_test[:, sorted_feature_indices]
-    
+
     def select_features_above_median_fdr(self):
 
         # Find the median FDR value
@@ -198,9 +232,12 @@ class Terminator:
 
         print(f"Number of principal components selected: {n_components}")
 
-## Training methods
+    def advanced_featureSel(self):
 
-    def RForest_train(self, n_estimators=100, max_depth=None, min_samples_split=2, min_samples_leaf=1, max_features='sqrt', validation='standard', n_splits=5):
+        pass
+
+## Training methods
+    def RForest_train(self, n_estimators=100, max_depth=None, min_samples_split=2, min_samples_leaf=1, max_features='sqrt', validation='standard', cv=5, echo=True):
         rf_model = RandomForestClassifier(n_estimators=n_estimators, max_depth=max_depth,
                                           min_samples_split=min_samples_split, min_samples_leaf=min_samples_leaf,
                                           max_features=max_features, random_state=42)
@@ -209,44 +246,50 @@ class Terminator:
             rf_model.fit(self.X_train, self.y_train)
             self.y_pred = rf_model.predict(self.X_test)
             accuracy = accuracy_score(self.y_test, self.y_pred)
-            print(f"------------------------------------------------------------")
-            print(f"Accuracy of Random Forest: {accuracy * 100:.2f}%")
-            self.conf_mat()
-            print(f"------------------------------------------------------------")
-            return accuracy * 100
-        elif validation == 'kfold':
-            scores = cross_validate(rf_model, np.vstack((self.X_train, self.X_test)), np.concatenate((self.y_train, self.y_test)), cv=n_splits, scoring='accuracy', return_train_score=True)
-            print(f"------------------------------------------------------------")
-            print(f"Average K-Fold Test Accuracy of Random Forest: {np.mean(scores['test_score']) * 100:.2f}%")
-            print(f"Average K-Fold Train Accuracy of Random Forest: {np.mean(scores['train_score']) * 100:.2f}%")
-            print(f"Std Dev of K-Fold Test Accuracy of Random Forest: {np.std(scores['test_score']) * 100:.2f}%")
-            print(f"Std Dev of K-Fold Train Accuracy of Random Forest: {np.std(scores['train_score']) * 100:.2f}%")
-            print(f"------------------------------------------------------------")
-            return np.mean(scores['train_score']) * 100
-        else:
-            print("Invalid validation method specified.")
-    
-    def KNN_train(self, n_neighbors=20, p=1, weights='distance', leaf_size=20, algorithm='auto', validation='standard', n_splits=5):
-            knn_model = KNeighborsClassifier(n_neighbors=n_neighbors, p=p, weights=weights, leaf_size=leaf_size, algorithm=algorithm)
-            
-            if validation == 'standard':
-                knn_model.fit(self.X_train, self.y_train)
-                self.y_pred = knn_model.predict(self.X_test)
-                accuracy = accuracy_score(self.y_test, self.y_pred)
+            if echo:
                 print(f"------------------------------------------------------------")
-                print(f"Accuracy of KNN: {accuracy * 100:.2f}%")
+                print(f"Accuracy of Random Forest: {accuracy * 100:.2f}%")
                 self.conf_mat()
                 print(f"------------------------------------------------------------")
-                return accuracy * 100
-            elif validation == 'kfold':
-                scores = cross_validate(knn_model, np.vstack((self.X_train, self.X_test)), np.concatenate((self.y_train, self.y_test)), cv=n_splits, scoring='accuracy', return_train_score=True)
+            return {'accuracy': accuracy * 100}
+        elif validation == 'kfold':
+            scores = cross_validate(rf_model, np.vstack((self.X_train, self.X_test)), np.concatenate((self.y_train, self.y_test)), cv=cv, scoring='accuracy', return_train_score=True)
+            mean_test_accuracy = np.mean(scores['test_score']) * 100
+            std_test_accuracy = np.std(scores['test_score']) * 100
+            if echo:
                 print(f"------------------------------------------------------------")
                 print(f"Average K-Fold Test Accuracy of KNN: {np.mean(scores['test_score']) * 100:.2f}%")
                 print(f"Average K-Fold Train Accuracy of KNN: {np.mean(scores['train_score']) * 100:.2f}%")
                 print(f"Std Dev of K-Fold Test Accuracy of KNN: {np.std(scores['test_score']) * 100:.2f}%")
                 print(f"Std Dev of K-Fold Train Accuracy of KNN: {np.std(scores['train_score']) * 100:.2f}%")
                 print(f"------------------------------------------------------------")
-                return np.mean(scores['train_score']) * 100
+            return {'mean_accuracy': mean_test_accuracy, 'std_accuracy': std_test_accuracy}
+    
+    def KNN_train(self, n_neighbors=20, p=1, weights='distance', leaf_size=20, algorithm='auto', validation='standard', cv=5, echo = True):
+            knn_model = KNeighborsClassifier(n_neighbors=n_neighbors, p=p, weights=weights, leaf_size=leaf_size, algorithm=algorithm)
+            
+            if validation == 'standard':
+                knn_model.fit(self.X_train, self.y_train)
+                self.y_pred = knn_model.predict(self.X_test)
+                accuracy = accuracy_score(self.y_test, self.y_pred)
+                if echo:
+                    print(f"------------------------------------------------------------")
+                    print(f"Accuracy of KNN: {accuracy * 100:.2f}%")
+                    self.conf_mat()
+                    print(f"------------------------------------------------------------")
+                return {'accuracy': accuracy * 100}
+            elif validation == 'kfold':
+                scores = cross_validate(knn_model, np.vstack((self.X_train, self.X_test)), np.concatenate((self.y_train, self.y_test)), cv=cv, scoring='accuracy', return_train_score=True)
+                mean_test_accuracy = np.mean(scores['test_score']) * 100
+                std_test_accuracy = np.std(scores['test_score']) * 100
+                if echo:
+                    print(f"------------------------------------------------------------")
+                    print(f"Average K-Fold Test Accuracy of KNN: {np.mean(scores['test_score']) * 100:.2f}%")
+                    print(f"Average K-Fold Train Accuracy of KNN: {np.mean(scores['train_score']) * 100:.2f}%")
+                    print(f"Std Dev of K-Fold Test Accuracy of KNN: {np.std(scores['test_score']) * 100:.2f}%")
+                    print(f"Std Dev of K-Fold Train Accuracy of KNN: {np.std(scores['train_score']) * 100:.2f}%")
+                    print(f"------------------------------------------------------------")
+                return {'mean_accuracy': mean_test_accuracy, 'std_accuracy': std_test_accuracy}
             else:
                 print("Invalid validation method specified.")         
 
@@ -274,7 +317,7 @@ class Terminator:
         else:
             print("Invalid validation method specified.")
 
-    def MLP_train(self, hidden_layer_sizes=(100,), activation='relu', solver='adam', validation='standard', n_splits=5, max_iter = 200):
+    def MLP_train(self, hidden_layer_sizes=(100,), activation='relu', solver='adam', validation='standard', alpha=0.001, cv=5, max_iter = 200, echo = True):
         mlp_model = MLPClassifier(hidden_layer_sizes=hidden_layer_sizes, activation=activation, solver=solver, alpha=0.001, batch_size='auto', learning_rate='constant', 
                                   learning_rate_init=0.001, power_t=0.5, max_iter=max_iter, shuffle=True, random_state=None, tol=0.0001, verbose=False, 
                                   warm_start=False, momentum=0.9, nesterovs_momentum=True, early_stopping=False, validation_fraction=0.1, beta_1=0.9, 
@@ -284,20 +327,24 @@ class Terminator:
             mlp_model.fit(self.X_train, self.y_train)
             self.y_pred = mlp_model.predict(self.X_test)
             accuracy = accuracy_score(self.y_test, self.y_pred)
-            print(f"------------------------------------------------------------")
-            print(f"Accuracy of MLP: {accuracy * 100:.2f}%")
-            self.conf_mat()
-            print(f"------------------------------------------------------------")
-            return accuracy * 100
+            if echo:
+                print(f"------------------------------------------------------------")
+                print(f"Accuracy of MLP: {accuracy * 100:.2f}%")
+                self.conf_mat()
+                print(f"------------------------------------------------------------")
+            return {'accuracy': accuracy * 100}
         elif validation == 'kfold':
-            scores = cross_validate(mlp_model, np.vstack((self.X_train, self.X_test)), np.concatenate((self.y_train, self.y_test)), cv=n_splits, scoring='accuracy', return_train_score=True)
-            print(f"------------------------------------------------------------")
-            print(f"Average K-Fold Test Accuracy of MLP: {np.mean(scores['test_score']) * 100:.2f}%")
-            print(f"Average K-Fold Train Accuracy of MLP: {np.mean(scores['train_score']) * 100:.2f}%")
-            print(f"Std Dev of K-Fold Test Accuracy of MLP: {np.std(scores['test_score']) * 100:.2f}%")
-            print(f"Std Dev of K-Fold Train Accuracy of MLP: {np.std(scores['train_score']) * 100:.2f}%")
-            print(f"------------------------------------------------------------")
-            return np.mean(scores['test_score']) * 100
+            scores = cross_validate(mlp_model, np.vstack((self.X_train, self.X_test)), np.concatenate((self.y_train, self.y_test)), cv=cv, scoring='accuracy', return_train_score=True)
+            mean_test_accuracy = np.mean(scores['test_score']) * 100
+            std_test_accuracy = np.std(scores['test_score']) * 100
+            if echo:
+                print(f"------------------------------------------------------------")
+                print(f"Average K-Fold Test Accuracy of MLP: {np.mean(scores['test_score']) * 100:.2f}%")
+                print(f"Average K-Fold Train Accuracy of MLP: {np.mean(scores['train_score']) * 100:.2f}%")
+                print(f"Std Dev of K-Fold Test Accuracy of MLP: {np.std(scores['test_score']) * 100:.2f}%")
+                print(f"Std Dev of K-Fold Train Accuracy of MLP: {np.std(scores['train_score']) * 100:.2f}%")
+                print(f"------------------------------------------------------------")
+            return {'mean_accuracy': mean_test_accuracy, 'std_accuracy': std_test_accuracy}
         else:
             print("Invalid validation method specified.")
 
@@ -325,38 +372,200 @@ class Terminator:
         else:
             print("Invalid validation method specified.")
 
-    def plot_featureselection(self, filename):
+## Training regression methods
+
+    def GLM_train(self, family=sm.families.Gaussian(), link=None, validation='standard', cv=5, echo=True):
+        # Select the appropriate family
+        if link:
+            family = family(link=link)
+
+        if validation == 'standard':
+            # Fit the GLM model
+            glm_model = sm.GLM(self.y_train, self.X_train, family=family)
+            glm_results = glm_model.fit()
+            # Predict on the test set
+            self.y_pred = glm_results.predict(self.X_test)
+            # Calculate the accuracy using a metric like R-squared or mean squared error
+            mse = mean_squared_error(self.y_test, self.y_pred)
+            
+            if echo:
+                print(f"------------------------------------------------------------")
+                print(f"GLM Mean Squared Error: {mse:.2f}")
+                print(f"------------------------------------------------------------")
+            return mse
+        elif validation == 'kfold':
+            mse_scores = []
+            kf = KFold(n_splits=cv, shuffle=True, random_state=42)
+            
+            for train_index, test_index in kf.split(self.data_array):
+                X_train_fold, X_test_fold = self.data_array[train_index], self.data_array[test_index]
+                y_train_fold, self.y_test_fold = self.class_labels[train_index], self.class_labels[test_index]
+
+                glm_model = sm.GLM(y_train_fold, X_train_fold, family=family)
+                glm_results = glm_model.fit()
+                self.y_pred_fold = glm_results.predict(X_test_fold)
+                fold_mse = mean_squared_error(self.y_test_fold, self.y_pred_fold)
+                mse_scores.append(fold_mse)
+            
+            mean_mse = np.mean(mse_scores)
+            std_mse = np.std(mse_scores)
+            
+            if echo:
+                print(f"------------------------------------------------------------")
+                print(f"Average K-Fold GLM Mean Squared Error: {mean_mse:.2f}")
+                print(f"Std Dev of K-Fold GLM Mean Squared Error: {std_mse:.2f}")
+                print(f"------------------------------------------------------------")
+            return {'mean_mse': mean_mse, 'std_mse': std_mse}
+        else:
+            print("Invalid validation method specified.")            
+
+## Visualization
+    def feature_select_entropy(self, threshold=0.001, echo=True, plot=True, number_of_f=0):
+        print("Selecting features based on mutual information")
+        mutual_info_scores = mutual_info_classif(np.vstack((self.X_train, self.X_test)), np.concatenate((self.y_train, self.y_test)))
+
+        if number_of_f > 0:
+            # Select the top number_of_f features based on mutual information
+            sorted_indices = np.argsort(mutual_info_scores)[::-1]
+            selected_features = sorted_indices[:number_of_f]
+        else:
+            # Select features based on the threshold
+            selected_features = np.where(mutual_info_scores > threshold)[0]
+
+        if echo:
+            for feature, score in zip(range(len(mutual_info_scores)), mutual_info_scores):
+                print(f"Feature index: {feature}, Mutual Information Score: {score:.5f} {'(selected)' if feature in selected_features else ''}")
+
+        # Update X_train and X_test to include only selected features
+        self.X_train = self.X_train[:, selected_features]
+        self.X_test = self.X_test[:, selected_features]
+
+        print(f"Number of features selected: {len(selected_features)}")
+
+        # Optional plotting
+        if plot:
+            # Plotting the heatmap
+            plt.figure(figsize=(10, 8))
+            sns.heatmap(scores_df, annot=True, fmt=".3f", cmap="YlGnBu")
+            plt.title('Heatmap of Mutual Information Scores')
+            plt.xlabel('Patterns')
+            plt.ylabel('Channels')
+            plt.show()
+
+    def check_class_distribution(self):
+        class_counts = self.df['Class'].value_counts().sort_index()
+        
+        for class_label, count in class_counts.items():
+            print(f"Class {class_label}: {count} instances")
+        
+        #return class_counts            
+
+    def plot_feature_selection(self, range=np.arange(1, 130, 5), echo=True, use_cv=False):
+        knn_acc, knn_std = [], []
+        rf_acc, rf_std = [], []
+        MLP_acc, MLP_std = [], []
+        # NB_acc, NB_std = [], []
+        # SVM_acc, SVM_std = [], []
+
+        for number_of_f in range: 
+            self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.data_array, 
+                                                                                    self.class_labels, test_size=0.2, random_state=42)   
+            self.feature_select_entropy(echo=False, plot=False, number_of_f=number_of_f)
+            if use_cv:
+                knn_result = self.KNN_train(echo=echo, validation='kfold')
+                rf_result = self.RForest_train(echo=echo, validation='kfold')
+                mlp_result = self.MLP_train(hidden_layer_sizes=(200,100,50), max_iter=10000, validation='kfold')
+                # nb_result = self.GaussianNB_train(validation='kfold')
+                # svm_result = self.SVM_train(validation='kfold')
+
+                knn_acc.append(knn_result['mean_accuracy'].values)
+                knn_std.append(knn_result['std_accuracy'].values)
+
+                rf_acc.append(rf_result['mean_accuracy'].values)
+                rf_std.append(rf_result['std_accuracy'].values)
+
+                MLP_acc.append(mlp_result['mean_accuracy'].values)
+                MLP_std.append(mlp_result['std_accuracy'].values)
+
+                # NB_acc.append(nb_result['mean_accuracy'])
+                # NB_std.append(nb_result['std_accuracy'])
+                
+                # SVM_acc.append(svm_result['mean_accuracy'])
+                # SVM_std.append(svm_result['std_accuracy'])
+            else:
+                knn_accuracy = self.KNN_train(echo=echo)
+                rf_accuracy = self.RForest_train(echo=echo)
+                mlp_accuracy = self.MLP_train(echo=echo, hidden_layer_sizes=(200,100,50,20,10,), max_iter=10000)
+               
+                # nb_accuracy = self.GaussianNB_train()
+                # svm_accuracy = self.SVM_train()
+
+                knn_acc.append(knn_accuracy.values)
+                rf_acc.append(rf_accuracy.values)
+                MLP_acc.append(mlp_accuracy.values)
+                # NB_acc.append(nb_accuracy)
+                # SVM_acc.append(svm_accuracy)
+
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 8))
+        
+        sns.set_theme(style="darkgrid")
+
+        sns.lineplot(x=range, y=knn_acc, ax=ax1, label='KNN')
+        sns.lineplot(x=range, y=rf_acc, ax=ax1, label='Random Forest')
+        sns.lineplot(x=range, y=MLP_acc, ax=ax1, label='MLP')
+        # sns.lineplot(x=range, y=NB_acc, ax=ax1, label='NB')
+        # sns.lineplot(x=range, y=SVM_acc, ax=ax1, label='SVM')
+
+        ax1.set_title('Accuracy vs Number of Features')
+        ax1.set_xlabel('Number of features')
+        ax1.set_ylabel('Accuracy')
+
+        if use_cv:
+            sns.lineplot(x=range, y=knn_std, ax=ax2, label='KNN')
+            sns.lineplot(x=range, y=rf_std, ax=ax2, label='Random Forest')
+            sns.lineplot(x=range, y=MLP_std, ax=ax2, label='MLP')
+            # sns.lineplot(x=range, y=NB_std, ax=ax2, label='NB')
+            # sns.lineplot(x=range, y=SVM_std, ax=ax2, label='SVM')
+
+            ax2.set_title('Standard Deviation vs Number of Features')
+            ax2.set_xlabel('Number of features')
+            ax2.set_ylabel('Standard Deviation')
+
+        plt.tight_layout()
+        plt.show()
+
+    def plot_feature_selection_old(self, range = np.arange(1, 130, 5), echo = True):
             knn_acc = []
             rf_acc = []
-            #SVM_acc = []
             MLP_acc = []
             #NB_acc = []
+            #SVM_acc = []
 
-            for number_of_f in np.arange(1, 130, 5): 
+            for number_of_f in range: 
                 self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.data_array, 
                                                                                         self.class_labels, test_size=0.2, random_state=42)   
                 self.feature_select_entropy(echo=False, plot=False, number_of_f=number_of_f)
-                knn_accuracy = self.KNN_train() 
-                rf_accuracy = self.RForest_train()  
-                #svm_accuracy = self.SVM_train()
+                knn_accuracy = self.KNN_train(echo = echo) 
+                rf_accuracy = self.RForest_train(echo = echo)  
                 mlp_accuracy = self.MLP_train(hidden_layer_sizes=(200,100,50,20,10,), max_iter = 10000)
                 #NB_accuracy = self.GaussianNB_train()
+                #svm_accuracy = self.SVM_train()
 
                 knn_acc.append(knn_accuracy)
                 rf_acc.append(rf_accuracy)
-                #SVM_acc.append(svm_accuracy)
                 MLP_acc.append(mlp_accuracy)
                 #NB_acc.append(NB_accuracy)
+                #SVM_acc.append(svm_accuracy)
 
             plt.figure(figsize=(10, 8))
             
             sns.set_theme(style="darkgrid")
 
-            sns.lineplot(x = np.arange(1, 130, 5), y = knn_acc, label='KNN')
-            sns.lineplot(x = np.arange(1, 130, 5), y = rf_acc, label='Random Forest')
-            #sns.lineplot(x = np.arange(1, 130, 5), y = SVM_acc, label='SVM')
-            sns.lineplot(x = np.arange(1, 130, 5), y = MLP_acc, label='MLP')
-            #sns.lineplot(x = np.arange(1, 130, 5), y = NB_acc, label='NB')
+            sns.lineplot(x = range, y = knn_acc, label='KNN')
+            sns.lineplot(x = range, y = rf_acc, label='Random Forest')
+            #sns.lineplot(x = range, y = SVM_acc, label='SVM')
+            sns.lineplot(x = range, y = MLP_acc, label='MLP')
+            #sns.lineplot(x = range, y = NB_acc, label='NB')
 
             plt.title('Accuracy based on the number of retained features')
             plt.xlabel('Number of features')
@@ -364,19 +573,107 @@ class Terminator:
             plt.legend()
             plt.show()
 
+    def plot_feature_RFESVM(self, echo=False, range=np.arange(5, 130, 5), use_cv=False):
+
+        self.feature_counts = {}
+        model = SVC(kernel='linear')
+
+        self.rf_acc = []
+        self.knn_acc = []
+        self.MLP_acc = []
+
+        self.rf_std_dev = []
+        self.knn_std_dev = []
+        self.MLP_std_dev = []
+
+        for num_features_to_retain in range:
+
+            self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
+                self.data_array, self.class_labels, test_size=0.2, random_state=42)
+
+            rfe = RecursiveElimination(model, num_features_to_retain)
+            rfe.fit(np.vstack((self.X_train, self.X_test)), np.concatenate((self.y_train, self.y_test)))
+            
+            self.X_train = self.X_train[:, rfe.__features__]
+            self.X_test = self.X_test[:, rfe.__features__]
+
+            rf_results = self.RForest_train(echo=echo, validation='kfold' if use_cv else 'standard', cv=5)
+            knn_results = self.KNN_train(echo=echo, validation='kfold' if use_cv else 'standard', cv=5)
+            mlp_results = self.MLP_train(hidden_layer_sizes=(200, 100, 50), max_iter=10000, alpha=0.001, validation='kfold' if use_cv else 'standard', cv=5)
+
+            self.rf_acc.append(rf_results['mean_accuracy'] if use_cv else rf_results)
+            self.knn_acc.append(knn_results['mean_accuracy'] if use_cv else knn_results)
+            self.MLP_acc.append(mlp_results['mean_accuracy'] if use_cv else mlp_results)
+
+            if use_cv:
+                self.rf_std_dev.append(rf_results['std_accuracy'])
+                self.knn_std_dev.append(knn_results['std_accuracy'])
+                self.MLP_std_dev.append(mlp_results['std_accuracy'])
+
+            for feature in rfe.__features__:
+                self.feature_counts[feature] = self.feature_counts.get(feature, 0) + 1
+
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 8))
+        sns.set_theme(style="darkgrid")
+
+        sns.lineplot(x=range, y=self.knn_acc, ax=ax1, label='KNN Accuracy')
+        sns.lineplot(x=range, y=self.rf_acc, ax=ax1, label='Random Forest Accuracy')
+        sns.lineplot(x=range, y=self.MLP_acc, ax=ax1, label='MLP Accuracy')
+        ax1.set_title('Accuracy vs Number of Features')
+        ax1.set_xlabel('Number of features')
+        ax1.set_ylabel('Accuracy')
+
+        if use_cv:
+            sns.lineplot(x=range, y=self.knn_std_dev, ax=ax2, label='KNN Std Dev')
+            sns.lineplot(x=range, y=self.rf_std_dev, ax=ax2, label='Random Forest Std Dev')
+            sns.lineplot(x=range, y=self.MLP_std_dev, ax=ax2, label='MLP Std Dev')
+            ax2.set_title('Standard Deviation vs Number of Features')
+            ax2.set_xlabel('Number of features')
+            ax2.set_ylabel('Standard Deviation')
+        
+        plt.tight_layout()
+        plt.show()
+
+    def plot_normal_probability_and_histogram(self, column, save_path=None):
+        if column < 0 or column >= self.df.shape[1]:
+            print(f"Column index {column} is out of range.")
+            return
+
+        data = self.df.iloc[:, column]
+
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 4))
+
+        stats.probplot(data, dist="norm", plot=ax1)
+        ax1.set_title('Normal Q-Q plot')
+
+        ax2.hist(data, bins=20, edgecolor='black', alpha=0.7)
+        ax2.set_title('Histogram')
+
+        column_name = self.df.columns[column]
+        plt.suptitle(f'Normal Probability and Histogram for {column_name}')
+
+        plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+
+        if save_path:
+            plt.savefig(os.path.join(save_path, f'plot_std_{column_name}.png'))
+        else:
+            plt.show()
+
+        plt.close()
+
 ## Hyperparametrization
 
-    def HyperParametrizeRForest(self):
+    def HyperParametrizeRForest(self, verbose = 1):
         print(f"Computing Hyperparametrization of random forest classifier ")
         param_grid = {
-            'n_estimators': [10, 50, 100, 200],
+            'n_estimators': [10, 50, 100, 200, 300, 400, 500],
             'max_depth': [None, 10, 20, 30],
             'min_samples_split': [2, 5, 10],
             'min_samples_leaf': [1, 2, 4],
             'max_features': ['sqrt', 'log2']
         }
 
-        grid_search = GridSearchCV(RandomForestClassifier(random_state=42), param_grid, cv=10, scoring='accuracy')
+        grid_search = GridSearchCV(RandomForestClassifier(random_state=42), param_grid, cv=10, scoring='accuracy', verbose = verbose)
         grid_search.fit(self.X_train, self.y_train)
 
         best_params = grid_search.best_params_
@@ -409,10 +706,10 @@ class Terminator:
         print(f"Computing Hyperparametrization of MLP classifier ")
 
         param_grid = {
-            'hidden_layer_sizes': [(50,), (100,), (50, 50), (100, 100),(200, 100), (200, 100, 50), (200, 100, 50, 20) ],
-            'activation': ['relu'],
+            'hidden_layer_sizes': [(200, 100, 50), (200, 100, 50, 20), (150,70,30,15,5,) ],
+            'activation': ['relu', 'tanh'],
             'solver': ['adam'],
-            'alpha': [0.0001, 0.001],  # L2 penalty (regularization term) parameter
+            'alpha': [0.001, 0.01],  # L2 penalty (regularization term) parameter
             'learning_rate': ['constant', 'adaptive'],
         }
 
@@ -429,7 +726,6 @@ class Terminator:
 
         return grid_search.best_estimator_
     
-
     def conf_matold(self, porcentage = False):
         cm = confusion_matrix(self.y_test, self.y_pred)
 
@@ -451,11 +747,12 @@ class Terminator:
                     print(f"{labels[i]:10}{row[0]:^10.2f}{row[1]:^10.2f}{row[2]:^10.2f}")
                 else:
                     print(f"{labels[i]:10}{row[0]:^10}{row[1]:^10}{row[2]:^10}")            
-
+ 
 ## Tester
-
 if __name__ == "__main__":
-    t13 = Terminator("D:\shared_git\MaestriaThesis\FeaturesTabs\pp01_t13.csv", method = 'dwt_energy',Hyperparam = False, 
-                      Types = [1,2,3,4,5,6,7,8,9,10,11,12], 
-                      mod = ['Air','Air','Air','Air','Vib','Vib','Vib','Vib','Car','Car','Car','Car'])
+    T17 = Terminator("D:\shared_git\MaestriaThesis\FeaturesTabs\pp01_t17.csv", method = 'dwt_energy', 
+        Types = [9,10,11,12], mod = [1,2,3,4])
+    print(T17.df.head())
+    T17.check_class_distribution()
+    T17.RForest_train()
 

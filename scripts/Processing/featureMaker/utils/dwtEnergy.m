@@ -5,10 +5,9 @@ function EEG = dwtEnergy(EEG)
     EEGchannels = {EEG.chanlocs.labels}';
     epoch_len = size(squeeze(EEG.data(1,:,:)),2);
     
-    F_sub = nan(epoch_len,length(EEGchannels)*6);
+    F_sub = nan(epoch_len,length(channels)*6);
     for epoch = 1:epoch_len
         for chan = 1:length(channels)
-            for
             try
                 idx = find(strcmp(channels, EEGchannels{chan}));
                 signal = squeeze(EEG.data(idx,:,:));
